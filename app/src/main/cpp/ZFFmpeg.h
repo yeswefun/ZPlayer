@@ -27,6 +27,9 @@ public:
     ~ZFFmpeg();
 
     void play();
+    void callPlayerOnError(int code, const char *text);
+
+    void releaseZFFmpeg();
 };
 
 

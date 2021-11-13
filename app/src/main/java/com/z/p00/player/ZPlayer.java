@@ -2,6 +2,8 @@ package com.z.p00.player;
 
 import android.text.TextUtils;
 
+import com.z.p00.player.listener.OnMediaErrorListener;
+
 public class ZPlayer {
 
     static {
@@ -12,6 +14,20 @@ public class ZPlayer {
 
     public void setDataSource(String url) {
         this.url = url;
+    }
+
+    private OnMediaErrorListener mOnMediaErrorListener;
+    public void setOnMediaErrorListener(OnMediaErrorListener listener) {
+        mOnMediaErrorListener = listener;
+    }
+
+    /*
+        native -> java
+     */
+    private void onError(int code, String text) {
+        if (mOnMediaErrorListener != null) {
+            mOnMediaErrorListener.onError(code, text);
+        }
     }
 
     public void play() {

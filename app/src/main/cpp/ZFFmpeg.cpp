@@ -11,6 +11,10 @@ ZFFmpeg::ZFFmpeg(ZJniCall *zJniCall, const char *url) {
 }
 
 ZFFmpeg::~ZFFmpeg() {
+    releaseZFFmpeg();
+}
+
+void ZFFmpeg::releaseZFFmpeg() {
     if (pResampleBuffer) {
         free(pResampleBuffer);
         pResampleBuffer = NULL;
@@ -29,16 +33,17 @@ ZFFmpeg::~ZFFmpeg() {
     }
 }
 
+
 void ZFFmpeg::play() {
 
     int ret = -1;
     if ((ret = avformat_open_input(&pFmtCtx, url, NULL, NULL)) != 0) {
-        LOGE("error: avformat_open_input, %d, %s", ret, av_err2str(ret));
+        callPlayerOnError(ERR_AVFORMAT_OPEN_INPUT, av_err2str(ret));
         return;
     }
 
     if ((ret = avformat_find_stream_info(pFmtCtx, NULL)) < 0) {
-        LOGE("error: avformat_find_stream_info, %d, %s", ret, av_err2str(ret));
+        callPlayerOnError(ERR_AVFORMAT_FIND_STREAM_INFO, av_err2str(ret));
         return;
     }
 
@@ -52,6 +57,7 @@ void ZFFmpeg::play() {
     int audioStreamIndex = -1;
     if ((ret = av_find_best_stream(pFmtCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0))) {
         LOGE("error: av_find_best_stream, %d, %s", ret, av_err2str(ret));
+        callPlayerOnError(ERR_AV_FIND_BEST_STREAM, av_err2str(ret));
         return;
     }
     audioStreamIndex = ret;
@@ -59,23 +65,23 @@ void ZFFmpeg::play() {
     AVCodecParameters *pCodecPar = pFmtCtx->streams[audioStreamIndex]->codecpar;
     AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);
     if (pCodec == NULL) {
-        LOGE("error: avcodec_find_decoder");
+        callPlayerOnError(ERR_AVCODEC_FIND_DECODER, "error: avcodec_find_decoder");
         return;
     }
 
     pCodecCtx = avcodec_alloc_context3(pCodec);
     if (pCodecCtx == NULL) {
-        LOGE("error: avcodec_alloc_context3");
+        callPlayerOnError(ERR_AVCODEC_ALLOC_CONTEXT3, "error: avcodec_alloc_context3");
         return;
     }
 
     if ((ret = avcodec_parameters_to_context(pCodecCtx, pCodecPar)) < 0) {
-        LOGE("error: avcodec_parameters_to_context, %d, %s", ret, av_err2str(ret));
+        callPlayerOnError(ERR_AVCODEC_PARAMETERS_TO_CONTEXT, av_err2str(ret));
         return;
     }
 
     if ((ret = avcodec_open2(pCodecCtx, pCodec, NULL)) < 0) {
-        LOGE("error: avcodec_open2, %d, %s", ret, av_err2str(ret));
+        callPlayerOnError(ERR_AVCODEC_OPEN2, av_err2str(ret));
         return;
     }
 
@@ -101,12 +107,12 @@ void ZFFmpeg::play() {
          in_ch_layout, in_sample_fmt, in_sample_rate,
          0, NULL);
     if (pSwrCtx == NULL) {
-        LOGE("error: swr_alloc_set_opts");
+        callPlayerOnError(ERR_SWR_ALLOC_SET_OPTS, "error: swr_alloc_set_opts");
         return;
     }
 
     if ((ret = swr_init(pSwrCtx)) < 0) {
-        LOGE("error: swr_init");
+        callPlayerOnError(ERR_SWR_INIT, "error: swr_init");
         return;
     }
 
@@ -149,5 +155,10 @@ void ZFFmpeg::play() {
     // 解决内存上涨问题
     zJniCall->jniEnv->ReleaseByteArrayElements(pcmByteArray, pcmData, 0);
     zJniCall->jniEnv->DeleteLocalRef(pcmByteArray);
+}
+
+void ZFFmpeg::callPlayerOnError(int code, const char *text) {
+    releaseZFFmpeg();
+    zJniCall->callPlayerOnError(code, text);
 }
 

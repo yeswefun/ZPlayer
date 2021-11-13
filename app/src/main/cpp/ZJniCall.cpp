@@ -4,9 +4,14 @@
 
 #include "ZJniCall.h"
 
-ZJniCall::ZJniCall(JavaVM *javaVm, JNIEnv *jniEnv) {
+ZJniCall::ZJniCall(JavaVM *javaVm, JNIEnv *jniEnv, jobject playerObject) {
     this->javaVm = javaVm;
     this->jniEnv = jniEnv;
+
+    this->playerObject = playerObject;
+    jclass playerClass = jniEnv->GetObjectClass(playerObject);
+    this->playerOnErrorMid = jniEnv->GetMethodID(playerClass, "onError", "(ILjava/lang/String;)V");
+
     createAudioObject();
 }
 
@@ -57,4 +62,10 @@ void ZJniCall::createAudioObject() {
 
 void ZJniCall::callAudioTrackWrite(jbyteArray audioData, int offsetInBytes, int sizeInBytes) {
     jniEnv->CallIntMethod(audioTrackObject, audioTrackWriteMid, audioData, offsetInBytes, sizeInBytes);
+}
+
+void ZJniCall::callPlayerOnError(int code, const char *text) {
+    jstring jtext = jniEnv->NewStringUTF(text);
+    jniEnv->CallVoidMethod(playerObject, playerOnErrorMid, code, jtext);
+    jniEnv->DeleteLocalRef(jtext);
 }
