@@ -7,7 +7,8 @@
 
 ZFFmpeg::ZFFmpeg(ZJniCall *zJniCall, const char *url) {
     this->zJniCall = zJniCall;
-    this->url = (char *)url;
+    this->url = (char *)malloc(strlen(url) + 1);
+    strcpy(this->url, url);
 }
 
 ZFFmpeg::~ZFFmpeg() {
@@ -15,6 +16,12 @@ ZFFmpeg::~ZFFmpeg() {
 }
 
 void ZFFmpeg::releaseZFFmpeg() {
+
+    if (url) {
+        free(url);
+        url = NULL;
+    }
+
     if (pResampleBuffer) {
         free(pResampleBuffer);
         pResampleBuffer = NULL;
@@ -35,7 +42,7 @@ void ZFFmpeg::releaseZFFmpeg() {
 
 void* handlePlay(void *arg) {
     ZFFmpeg *zfFmpeg = static_cast<ZFFmpeg *>(arg);
-    zfFmpeg->prepare();
+    zfFmpeg->prepare(false);
     return NULL;
 }
 
@@ -45,20 +52,20 @@ void ZFFmpeg::play() {
     pthread_detach(playThread);
 }
 
-void ZFFmpeg::callPlayerOnError(int code, const char *text) {
+void ZFFmpeg::callPlayerOnError(bool isMainThread, int code, const char *text) {
     releaseZFFmpeg();
-    zJniCall->callPlayerOnError(code, text);
+    zJniCall->callPlayerOnError(isMainThread, code, text);
 }
 
-void ZFFmpeg::prepare() {
+void ZFFmpeg::prepare(bool isMainThread) {
     int ret = -1;
     if ((ret = avformat_open_input(&pFmtCtx, url, NULL, NULL)) != 0) {
-        callPlayerOnError(ERR_AVFORMAT_OPEN_INPUT, av_err2str(ret));
+        callPlayerOnError(isMainThread, ERR_AVFORMAT_OPEN_INPUT, av_err2str(ret));
         return;
     }
 
     if ((ret = avformat_find_stream_info(pFmtCtx, NULL)) < 0) {
-        callPlayerOnError(ERR_AVFORMAT_FIND_STREAM_INFO, av_err2str(ret));
+        callPlayerOnError(isMainThread, ERR_AVFORMAT_FIND_STREAM_INFO, av_err2str(ret));
         return;
     }
 
@@ -72,7 +79,7 @@ void ZFFmpeg::prepare() {
     int audioStreamIndex = -1;
     if ((ret = av_find_best_stream(pFmtCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0))) {
         LOGE("error: av_find_best_stream, %d, %s", ret, av_err2str(ret));
-        callPlayerOnError(ERR_AV_FIND_BEST_STREAM, av_err2str(ret));
+        callPlayerOnError(isMainThread, ERR_AV_FIND_BEST_STREAM, av_err2str(ret));
         return;
     }
     audioStreamIndex = ret;
@@ -80,23 +87,23 @@ void ZFFmpeg::prepare() {
     AVCodecParameters *pCodecPar = pFmtCtx->streams[audioStreamIndex]->codecpar;
     AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);
     if (pCodec == NULL) {
-        callPlayerOnError(ERR_AVCODEC_FIND_DECODER, "error: avcodec_find_decoder");
+        callPlayerOnError(isMainThread, ERR_AVCODEC_FIND_DECODER, "error: avcodec_find_decoder");
         return;
     }
 
     pCodecCtx = avcodec_alloc_context3(pCodec);
     if (pCodecCtx == NULL) {
-        callPlayerOnError(ERR_AVCODEC_ALLOC_CONTEXT3, "error: avcodec_alloc_context3");
+        callPlayerOnError(isMainThread, ERR_AVCODEC_ALLOC_CONTEXT3, "error: avcodec_alloc_context3");
         return;
     }
 
     if ((ret = avcodec_parameters_to_context(pCodecCtx, pCodecPar)) < 0) {
-        callPlayerOnError(ERR_AVCODEC_PARAMETERS_TO_CONTEXT, av_err2str(ret));
+        callPlayerOnError(isMainThread, ERR_AVCODEC_PARAMETERS_TO_CONTEXT, av_err2str(ret));
         return;
     }
 
     if ((ret = avcodec_open2(pCodecCtx, pCodec, NULL)) < 0) {
-        callPlayerOnError(ERR_AVCODEC_OPEN2, av_err2str(ret));
+        callPlayerOnError(isMainThread, ERR_AVCODEC_OPEN2, av_err2str(ret));
         return;
     }
 
@@ -122,12 +129,12 @@ void ZFFmpeg::prepare() {
                                  in_ch_layout, in_sample_fmt, in_sample_rate,
                                  0, NULL);
     if (pSwrCtx == NULL) {
-        callPlayerOnError(ERR_SWR_ALLOC_SET_OPTS, "error: swr_alloc_set_opts");
+        callPlayerOnError(isMainThread, ERR_SWR_ALLOC_SET_OPTS, "error: swr_alloc_set_opts");
         return;
     }
 
     if ((ret = swr_init(pSwrCtx)) < 0) {
-        callPlayerOnError(ERR_SWR_INIT, "error: swr_init");
+        callPlayerOnError(isMainThread, ERR_SWR_INIT, "error: swr_init");
         return;
     }
 
@@ -135,7 +142,7 @@ void ZFFmpeg::prepare() {
     int out_channels = av_get_channel_layout_nb_channels(out_ch_layout);
     int dataSize = av_samples_get_buffer_size(NULL, out_channels, pCodecCtx->frame_size, out_sample_fmt, 0);
 
-    // AudioTrack播放音频的数据缓冲区
+    // AudioTrack播放音频的数据缓冲区 - 以下使用的zJniCall->jniEnv都需要判断是否在主线中还是在子线程中
     jbyteArray pcmByteArray = zJniCall->jniEnv->NewByteArray(dataSize);
     jbyte *pcmData = zJniCall->jniEnv->GetByteArrayElements(pcmByteArray, NULL);
 

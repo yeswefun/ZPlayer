@@ -22,17 +22,17 @@ public:
     uint8_t *pResampleBuffer = NULL;
 
     ZJniCall *zJniCall;
-    char *url;
+    char *url = NULL;
 
     ZFFmpeg(ZJniCall *zJniCall, const char *url);
     ~ZFFmpeg();
 
     void play();
-    void callPlayerOnError(int code, const char *text);
+    void callPlayerOnError(bool isMainThread, int code, const char *text);
 
     void releaseZFFmpeg();
 
-    void prepare();
+    void prepare(bool isMainThread);
 };
 
 

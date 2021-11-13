@@ -6,13 +6,14 @@
 #define P00_ZJNICALL_H
 
 #include <jni.h>
+#include "ZConstants.h"
 
 class ZJniCall {
 public:
     jobject audioTrackObject;
     jmethodID audioTrackWriteMid;
 
-    jobject playerObject;
+    jobject playerObject = NULL;
     jmethodID playerOnErrorMid;
 
     JNIEnv *jniEnv;
@@ -21,7 +22,7 @@ public:
     ZJniCall(JavaVM *javaVm, JNIEnv *jniEnv, jobject playerObject);
     ~ZJniCall();
     void callAudioTrackWrite(jbyteArray audioData, int offsetInBytes, int sizeInBytes);
-    void callPlayerOnError(int code, const char *text);
+    void callPlayerOnError(bool isMainThread, int code, const char *text);
 
 private:
     void createAudioObject();
