@@ -138,6 +138,9 @@ Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
                     memcpy(pcmData, pFrame->data, dataSize);
                     env->ReleaseByteArrayElements(pcmByteArray, pcmData, 0);
                     env->CallIntMethod(audioTrackObject, audioTrackWriteMid, pcmByteArray, 0, dataSize);
+                    // 没有下面这行，噪音，内存会不断上涨，直到崩掉
+                    // 有下面这行，噪音，内存会不断上涨，但不会崩掉
+                    env->DeleteLocalRef(pcmByteArray);
                 }
             }
         }
