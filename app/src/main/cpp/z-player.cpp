@@ -121,6 +121,11 @@ Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
     jclass audioTrackClass = env->GetObjectClass(audioTrackObject);
     jmethodID audioTrackWriteMid = env->GetMethodID(audioTrackClass, "write", "([BII)I");
 
+    // 5. 解决内存上涨问题
+    int dataSize = av_samples_get_buffer_size(NULL, pCodecCtx->channels, pCodecCtx->frame_size, pCodecCtx->sample_fmt, 0);
+    jbyteArray pcmByteArray = env->NewByteArray(dataSize);
+    jbyte *pcmData = env->GetByteArrayElements(pcmByteArray, NULL);
+
     // 3. 解码音频帧
     int frameIndex = 0;
     AVPacket *pPacket = av_packet_alloc();
@@ -132,15 +137,9 @@ Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
                     ++frameIndex;
                     LOGE("frame: %d", frameIndex);
 
-                    int dataSize = av_samples_get_buffer_size(NULL, pFrame->channels, pFrame->nb_samples, pCodecCtx->sample_fmt, 0);
-                    jbyteArray pcmByteArray = env->NewByteArray(dataSize);
-                    jbyte *pcmData = env->GetByteArrayElements(pcmByteArray, NULL);
                     memcpy(pcmData, pFrame->data, dataSize);
-                    env->ReleaseByteArrayElements(pcmByteArray, pcmData, 0);
+                    env->ReleaseByteArrayElements(pcmByteArray, pcmData, JNI_COMMIT);
                     env->CallIntMethod(audioTrackObject, audioTrackWriteMid, pcmByteArray, 0, dataSize);
-                    // 没有下面这行，噪音，内存会不断上涨，直到崩掉
-                    // 有下面这行，噪音，内存会不断上涨，但不会崩掉
-                    env->DeleteLocalRef(pcmByteArray);
                 }
             }
         }
@@ -149,6 +148,10 @@ Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
     }
     av_packet_free(&pPacket);
     av_frame_free(&pFrame);
+
+    // 解决内存上涨问题
+    env->ReleaseByteArrayElements(pcmByteArray, pcmData, 0);
+    env->DeleteLocalRef(pcmByteArray);
 
     if (pCodecCtx) {
         avcodec_free_context(&pCodecCtx);
