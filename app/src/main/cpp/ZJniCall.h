@@ -10,9 +10,6 @@
 
 class ZJniCall {
 public:
-    jobject audioTrackObject;
-    jmethodID audioTrackWriteMid;
-
     jobject playerObject = NULL;
     jmethodID playerOnErrorMid;
 
@@ -21,11 +18,7 @@ public:
 
     ZJniCall(JavaVM *javaVm, JNIEnv *jniEnv, jobject playerObject);
     ~ZJniCall();
-    void callAudioTrackWrite(jbyteArray audioData, int offsetInBytes, int sizeInBytes);
     void callPlayerOnError(bool isMainThread, int code, const char *text);
-
-private:
-    void createAudioObject();
 };
 
 

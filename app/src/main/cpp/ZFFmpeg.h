@@ -8,6 +8,8 @@
 extern "C" {
 #include "libavformat/avformat.h"
 #include "libswresample/swresample.h"
+#include <SLES/OpenSLES.h>
+#include <SLES/OpenSLES_Android.h>
 #include <pthread.h>
 }
 
@@ -24,6 +26,8 @@ public:
     ZJniCall *zJniCall;
     char *url = NULL;
 
+    int audioStreamIndex = -1;
+
     ZFFmpeg(ZJniCall *zJniCall, const char *url);
     ~ZFFmpeg();
 
@@ -33,6 +37,10 @@ public:
     void releaseZFFmpeg();
 
     void prepare(bool isMainThread);
+
+    void initOpenSLES();
+
+    int resampleAudio();
 };
 
 
