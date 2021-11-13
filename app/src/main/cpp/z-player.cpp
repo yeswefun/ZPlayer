@@ -12,6 +12,7 @@
 
 extern "C" {
 #include "libavformat/avformat.h"
+#include "libswresample/swresample.h"
 }
 
 
@@ -121,10 +122,45 @@ Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
     jclass audioTrackClass = env->GetObjectClass(audioTrackObject);
     jmethodID audioTrackWriteMid = env->GetMethodID(audioTrackClass, "write", "([BII)I");
 
+    /*
+        6. 解决音频噪音问题 - 音频重采样
+        struct SwrContext *swr_alloc_set_opts(struct SwrContext *s,
+          int64_t out_ch_layout, enum AVSampleFormat out_sample_fmt, int out_sample_rate,
+          int64_t  in_ch_layout, enum AVSampleFormat  in_sample_fmt, int  in_sample_rate,
+          int log_offset, void *log_ctx);
+     */
+    int64_t out_ch_layout = AV_CH_LAYOUT_STEREO;
+    enum AVSampleFormat out_sample_fmt = AV_SAMPLE_FMT_S16;
+    int out_sample_rate = 44100;
+
+    int64_t in_ch_layout = pCodecCtx->channel_layout;
+    enum AVSampleFormat in_sample_fmt = pCodecCtx->sample_fmt;
+    int in_sample_rate = pCodecCtx->sample_rate;
+
+    SwrContext *pSwrCtx = swr_alloc_set_opts(NULL,
+            out_ch_layout, out_sample_fmt, out_sample_rate,
+            in_ch_layout, in_sample_fmt, in_sample_rate,
+            0, NULL);
+    if (pSwrCtx == NULL) {
+        LOGE("error: swr_alloc_set_opts");
+        return;
+    }
+
+    if ((ret = swr_init(pSwrCtx)) < 0) {
+        LOGE("error: swr_init");
+        return;
+    }
+
     // 5. 解决内存上涨问题
-    int dataSize = av_samples_get_buffer_size(NULL, pCodecCtx->channels, pCodecCtx->frame_size, pCodecCtx->sample_fmt, 0);
+    int out_channels = av_get_channel_layout_nb_channels(out_ch_layout);
+    int dataSize = av_samples_get_buffer_size(NULL, out_channels, pCodecCtx->frame_size, out_sample_fmt, 0);
+
+    // AudioTrack播放音频的数据缓冲区
     jbyteArray pcmByteArray = env->NewByteArray(dataSize);
     jbyte *pcmData = env->GetByteArrayElements(pcmByteArray, NULL);
+
+    // 重采样的数据缓冲区
+    uint8_t *pResampleBuffer = (uint8_t *)malloc(dataSize);
 
     // 3. 解码音频帧
     int frameIndex = 0;
@@ -137,7 +173,9 @@ Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
                     ++frameIndex;
                     LOGE("frame: %d", frameIndex);
 
-                    memcpy(pcmData, pFrame->data, dataSize);
+                    swr_convert(pSwrCtx, &pResampleBuffer, pFrame->nb_samples, (const uint8_t **)pFrame->data, pFrame->nb_samples);
+
+                    memcpy(pcmData, pResampleBuffer, dataSize);
                     env->ReleaseByteArrayElements(pcmByteArray, pcmData, JNI_COMMIT);
                     env->CallIntMethod(audioTrackObject, audioTrackWriteMid, pcmByteArray, 0, dataSize);
                 }
@@ -152,6 +190,15 @@ Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
     // 解决内存上涨问题
     env->ReleaseByteArrayElements(pcmByteArray, pcmData, 0);
     env->DeleteLocalRef(pcmByteArray);
+
+    if (pResampleBuffer) {
+        free(pResampleBuffer);
+        pResampleBuffer = NULL;
+    }
+
+    if (pSwrCtx) {
+        swr_free(&pSwrCtx);
+    }
 
     if (pCodecCtx) {
         avcodec_free_context(&pCodecCtx);
