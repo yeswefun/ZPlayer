@@ -8,6 +8,7 @@
 extern "C" {
 #include "libavformat/avformat.h"
 #include "libswresample/swresample.h"
+#include <pthread.h>
 }
 
 #include "ZConstants.h"
@@ -30,6 +31,8 @@ public:
     void callPlayerOnError(int code, const char *text);
 
     void releaseZFFmpeg();
+
+    void prepare();
 };
 
 

@@ -33,9 +33,24 @@ void ZFFmpeg::releaseZFFmpeg() {
     }
 }
 
+void* handlePlay(void *arg) {
+    ZFFmpeg *zfFmpeg = static_cast<ZFFmpeg *>(arg);
+    zfFmpeg->prepare();
+    return NULL;
+}
 
 void ZFFmpeg::play() {
+    pthread_t playThread;
+    pthread_create(&playThread, NULL, handlePlay, this);
+    pthread_detach(playThread);
+}
 
+void ZFFmpeg::callPlayerOnError(int code, const char *text) {
+    releaseZFFmpeg();
+    zJniCall->callPlayerOnError(code, text);
+}
+
+void ZFFmpeg::prepare() {
     int ret = -1;
     if ((ret = avformat_open_input(&pFmtCtx, url, NULL, NULL)) != 0) {
         callPlayerOnError(ERR_AVFORMAT_OPEN_INPUT, av_err2str(ret));
@@ -103,9 +118,9 @@ void ZFFmpeg::play() {
     int in_sample_rate = pCodecCtx->sample_rate;
 
     pSwrCtx = swr_alloc_set_opts(NULL,
-         out_ch_layout, out_sample_fmt, out_sample_rate,
-         in_ch_layout, in_sample_fmt, in_sample_rate,
-         0, NULL);
+                                 out_ch_layout, out_sample_fmt, out_sample_rate,
+                                 in_ch_layout, in_sample_fmt, in_sample_rate,
+                                 0, NULL);
     if (pSwrCtx == NULL) {
         callPlayerOnError(ERR_SWR_ALLOC_SET_OPTS, "error: swr_alloc_set_opts");
         return;
@@ -155,10 +170,5 @@ void ZFFmpeg::play() {
     // 解决内存上涨问题
     zJniCall->jniEnv->ReleaseByteArrayElements(pcmByteArray, pcmData, 0);
     zJniCall->jniEnv->DeleteLocalRef(pcmByteArray);
-}
-
-void ZFFmpeg::callPlayerOnError(int code, const char *text) {
-    releaseZFFmpeg();
-    zJniCall->callPlayerOnError(code, text);
 }
 

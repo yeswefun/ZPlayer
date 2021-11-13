@@ -17,7 +17,7 @@ import java.io.File;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
-    private final File mFile = new File(Environment.getExternalStorageDirectory(), "/Music/x5.mp3");
+    private final File mFile = new File(Environment.getExternalStorageDirectory(), "/Music/5.mp3");
     private ZPlayer mPlayer;
 
     @Override
