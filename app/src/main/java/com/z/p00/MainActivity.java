@@ -13,7 +13,7 @@ import com.z.p00.player.listener.OnMediaPreparedListener;
 import java.io.File;
 
 /*
-
+    一个简单的音视频播放器
  */
 public class MainActivity extends AppCompatActivity {
 
