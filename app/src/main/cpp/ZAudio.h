@@ -15,16 +15,21 @@ extern "C" {
 
 #include "ZConstants.h"
 #include "ZJniCall.h"
+#include "ZPacketQueue.h"
+#include "ZPlayerState.h"
 
 class ZAudio {
 public:
-    AVFormatContext *pFmtCtx = NULL;
-    AVCodecContext *pCodecCtx = NULL;
+    AVFormatContext *pFmtCtx;
+    AVCodecContext *pCodecCtx;
     SwrContext *pSwrCtx = NULL;
 
     uint8_t *pResampleBuffer = NULL;
     int audioStreamIndex = -1;
     ZJniCall *zJniCall;
+
+    ZPacketQueue *pPacketQueue = NULL;
+    ZPlayerState *pPlayerState = NULL;
 
     ZAudio(ZJniCall *zJniCall, AVFormatContext *pFmtCtx, AVCodecContext *pCodecCtx, int audioStreamIndex);
     ~ZAudio();
@@ -35,6 +40,8 @@ public:
     void analyzeAudioStream(bool isMainThread);
 
     void play();
+
+    void initReadPacket();
 };
 
 

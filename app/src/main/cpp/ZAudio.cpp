@@ -9,6 +9,9 @@ ZAudio::ZAudio(ZJniCall *zJniCall, AVFormatContext *pFmtCtx, AVCodecContext *pCo
     this->pFmtCtx = pFmtCtx;
     this->pCodecCtx = pCodecCtx;
     this->audioStreamIndex = audioStreamIndex;
+
+    this->pPacketQueue = new ZPacketQueue();
+    this->pPlayerState = new ZPlayerState();
 }
 
 ZAudio::~ZAudio() {
@@ -16,6 +19,17 @@ ZAudio::~ZAudio() {
 }
 
 void ZAudio::releaseZAudio() {
+
+    if (pPlayerState) {
+        delete pPlayerState;
+        pPlayerState = NULL;
+    }
+
+    if (pPacketQueue) {
+        delete pPacketQueue;
+        pPacketQueue = NULL;
+    }
+
     if (pResampleBuffer) {
         free(pResampleBuffer);
         pResampleBuffer = NULL;
@@ -98,17 +112,15 @@ void ZAudio::initOpenSLES() {
 
 int ZAudio::resampleAudio() {
     int dataSize = 0;
-    // 3. 解码音频帧
-    AVPacket *pPacket = av_packet_alloc();
+    AVPacket *pPacket = NULL;
     AVFrame *pFrame = av_frame_alloc();
-    while (av_read_frame(pFmtCtx, pPacket) == 0) {
-        if (pPacket->stream_index == audioStreamIndex) {
-            if (avcodec_send_packet(pCodecCtx, pPacket) == 0) {
-                if (avcodec_receive_frame(pCodecCtx, pFrame) == 0) {
-                    // number of samples output per channel
-                    dataSize = swr_convert(pSwrCtx, &pResampleBuffer, pFrame->nb_samples, (const uint8_t **)pFrame->data, pFrame->nb_samples);
-                    break;
-                }
+    while (pPlayerState != NULL && !pPlayerState->isExit) {
+        pPacket = pPacketQueue->pop();
+        if (avcodec_send_packet(pCodecCtx, pPacket) == 0) {
+            if (avcodec_receive_frame(pCodecCtx, pFrame) == 0) {
+                // number of samples output per channel
+                dataSize = swr_convert(pSwrCtx, &pResampleBuffer, pFrame->nb_samples, (const uint8_t **)pFrame->data, pFrame->nb_samples);
+                break;
             }
         }
         av_packet_unref(pPacket);
@@ -120,6 +132,12 @@ int ZAudio::resampleAudio() {
     return dataSize * 2 * 2;
 }
 
+void* handlereadPacket(void *arg) {
+    ZAudio *pAudio = static_cast<ZAudio *>(arg);
+    pAudio->initReadPacket();
+    return NULL;
+}
+
 void* handlePlay(void *arg) {
     ZAudio *pAudio = static_cast<ZAudio *>(arg);
     pAudio->initOpenSLES();
@@ -127,6 +145,10 @@ void* handlePlay(void *arg) {
 }
 
 void ZAudio::play() {
+    pthread_t readPacketThread;
+    pthread_create(&readPacketThread, NULL, handlereadPacket, this);
+    pthread_detach(readPacketThread);
+
     pthread_t playThread;
     pthread_create(&playThread, NULL, handlePlay, this);
     pthread_detach(playThread);
@@ -169,6 +191,23 @@ void ZAudio::analyzeAudioStream(bool isMainThread) {
     int dataSize = av_samples_get_buffer_size(NULL, out_channels, pCodecCtx->frame_size, out_sample_fmt, 0);
     // 重采样的数据缓冲区
     pResampleBuffer = (uint8_t *)malloc(dataSize);
+}
+
+void ZAudio::initReadPacket() {
+    while (pPlayerState != NULL && !pPlayerState->isExit) {
+        AVPacket *pPacket = av_packet_alloc();
+        if (av_read_frame(pFmtCtx, pPacket) == 0) {
+            if (pPacket->stream_index == audioStreamIndex) {
+                LOGE("read packet - audio");
+                pPacketQueue->push(pPacket);
+            } else {
+                av_packet_free(&pPacket);
+            }
+        } else {
+            LOGE("finished read packet - audio ***************");
+            break;
+        }
+    }
 }
 
 
