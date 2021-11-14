@@ -25,24 +25,35 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
  */
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj, jstring url) {
-
-    const char *nurl = env->GetStringUTFChars(url, NULL);
-    LOGE("(native)file path: %s", nurl);
-
-    zJniCall = new ZJniCall(NULL, env, obj);
-    zFFmpeg = new ZFFmpeg(zJniCall, nurl);
-    zFFmpeg->play();
-
-//    if (zFFmpeg) {
-//        delete zFFmpeg;
-//        zFFmpeg = NULL;
-//    }
-//
-//    if (zJniCall) {
-//        delete zJniCall;
-//        zJniCall = NULL;
-//    }
-
-    env->ReleaseStringUTFChars(url, nurl);
+Java_com_z_p00_player_ZPlayer_nPlay(JNIEnv *env, jobject obj) {
+    if (zFFmpeg) {
+        zFFmpeg->play();
+    }
 }
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_z_p00_player_ZPlayer_nPrepareAsync(JNIEnv *env, jobject obj, jstring url) {
+    if (zFFmpeg == NULL) {
+        const char *nurl = env->GetStringUTFChars(url, NULL);
+        LOGE("(native)file path: %s", nurl);
+        zJniCall = new ZJniCall(javaVM, env, obj);
+        zFFmpeg = new ZFFmpeg(zJniCall, nurl);
+        zFFmpeg->prepareAsync();
+        env->ReleaseStringUTFChars(url, nurl);
+    }
+}
+
+/*
+    nStop
+
+    if (zFFmpeg) {
+        delete zFFmpeg;
+        zFFmpeg = NULL;
+    }
+
+    if (zJniCall) {
+        delete zJniCall;
+        zJniCall = NULL;
+    }
+ */

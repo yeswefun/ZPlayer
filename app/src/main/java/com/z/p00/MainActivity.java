@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.z.p00.player.ZPlayer;
 import com.z.p00.player.listener.OnMediaErrorListener;
+import com.z.p00.player.listener.OnMediaPreparedListener;
 
 import java.io.File;
 
@@ -33,6 +34,13 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "code: " + code + ", text: " + text);
             }
         });
-        mPlayer.play();
+        mPlayer.setOnMediaPreparedListener(new OnMediaPreparedListener() {
+            @Override
+            public void onPrepared() {
+                Log.e(TAG, "准备完毕");
+                mPlayer.play();
+            }
+        });
+        mPlayer.prepareAsync();
     }
 }

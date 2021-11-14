@@ -12,6 +12,7 @@ class ZJniCall {
 public:
     jobject playerObject = NULL;
     jmethodID playerOnErrorMid;
+    jmethodID playerOnPreparedMid;
 
     JNIEnv *jniEnv;
     JavaVM *javaVm;
@@ -19,6 +20,7 @@ public:
     ZJniCall(JavaVM *javaVm, JNIEnv *jniEnv, jobject playerObject);
     ~ZJniCall();
     void callPlayerOnError(bool isMainThread, int code, const char *text);
+    void callPlayerOnPrepared(bool isMainThread);
 };
 
 

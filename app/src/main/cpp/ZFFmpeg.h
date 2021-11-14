@@ -41,6 +41,8 @@ public:
     void initOpenSLES();
 
     int resampleAudio();
+
+    void prepareAsync();
 };
 
 

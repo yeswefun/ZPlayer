@@ -11,6 +11,7 @@ ZJniCall::ZJniCall(JavaVM *javaVm, JNIEnv *jniEnv, jobject playerObject) {
     this->playerObject = jniEnv->NewGlobalRef(playerObject);
     jclass playerClass = jniEnv->GetObjectClass(playerObject);
     this->playerOnErrorMid = jniEnv->GetMethodID(playerClass, "onError", "(ILjava/lang/String;)V");
+    this->playerOnPreparedMid = jniEnv->GetMethodID(playerClass, "onPrepared", "()V");
 }
 
 ZJniCall::~ZJniCall() {
@@ -34,6 +35,20 @@ void ZJniCall::callPlayerOnError(bool isMainThread, int code, const char *text) 
         jstring jtext = env->NewStringUTF(text);
         env->CallVoidMethod(playerObject, playerOnErrorMid, code, jtext);
         env->DeleteLocalRef(jtext);
+        javaVm->DetachCurrentThread();
+    }
+}
+
+void ZJniCall::callPlayerOnPrepared(bool isMainThread) {
+    if (isMainThread) {
+        jniEnv->CallVoidMethod(playerObject, playerOnPreparedMid);
+    } else {
+        JNIEnv *env = NULL;
+        if (javaVm->AttachCurrentThread(&env, NULL) != JNI_OK) {
+            LOGE("error: failed to AttachCurrentThread, [%s:%d]", __FILE__, __LINE__);
+            return;
+        }
+        env->CallVoidMethod(playerObject, playerOnPreparedMid);
         javaVm->DetachCurrentThread();
     }
 }

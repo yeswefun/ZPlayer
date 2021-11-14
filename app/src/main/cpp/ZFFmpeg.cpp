@@ -41,8 +41,8 @@ void ZFFmpeg::releaseZFFmpeg() {
 }
 
 void* handlePlay(void *arg) {
-    ZFFmpeg *zfFmpeg = static_cast<ZFFmpeg *>(arg);
-    zfFmpeg->prepare(false);
+    ZFFmpeg *zFFmpeg = static_cast<ZFFmpeg *>(arg);
+    zFFmpeg->initOpenSLES();
     return NULL;
 }
 
@@ -144,7 +144,8 @@ void ZFFmpeg::prepare(bool isMainThread) {
     // 重采样的数据缓冲区
     pResampleBuffer = (uint8_t *)malloc(dataSize);
 
-    this->initOpenSLES();
+    // 通知java层, native层已经准备完毕
+    zJniCall->callPlayerOnPrepared(isMainThread);
 }
 
 
@@ -240,4 +241,16 @@ int ZFFmpeg::resampleAudio() {
     av_frame_free(&pFrame);
     // 两个通道，每个通道的采样点dataSize，每个采样点存储为2个字节
     return dataSize * 2 * 2;
+}
+
+void* handlePrepareAsync(void *arg) {
+    ZFFmpeg *zFFmpeg = static_cast<ZFFmpeg *>(arg);
+    zFFmpeg->prepare(false);
+    return NULL;
+}
+
+void ZFFmpeg::prepareAsync() {
+    pthread_t prepareAsyncThread;
+    pthread_create(&prepareAsyncThread, NULL, handlePrepareAsync, this);
+    pthread_detach(prepareAsyncThread);
 }
