@@ -22,6 +22,11 @@ void ZFFmpeg::releaseZFFmpeg() {
         pPlayerState = NULL;
     }
 
+    if (pVideo) {
+        delete pVideo;
+        pVideo = NULL;
+    }
+
     if (pAudio) {
         delete pAudio;
         pAudio = NULL;
@@ -44,11 +49,14 @@ void ZFFmpeg::initReadPacket() {
             if (pPacket->stream_index == pAudio->streamIndex) {
                 LOGE("read packet - audio");
                 pAudio->pPacketQueue->push(pPacket);
+            } else if (pPacket->stream_index == pVideo->streamIndex) {
+                LOGE("read packet - video");
+                pVideo->pPacketQueue->push(pPacket);
             } else {
                 av_packet_free(&pPacket);
             }
         } else {
-            LOGE("finished read packet - audio ***************");
+            LOGE("finished read packet ***************");
             break;
         }
     }
@@ -68,6 +76,10 @@ void ZFFmpeg::play() {
 
     if (pAudio) {
         pAudio->play();
+    }
+
+    if (pVideo) {
+        pVideo->play();
     }
 }
 
@@ -109,6 +121,17 @@ void ZFFmpeg::prepare(bool isMainThread) {
     pAudio = new ZAudio(zJniCall, pPlayerState, audioStreamIndex);
     pAudio->analyzeStream(isMainThread, pFmtCtx);
 
+    // 初始视频播放器
+    int videoStreamIndex = -1;
+    if ((ret = av_find_best_stream(pFmtCtx, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0)) < 0) {
+        LOGE("error: av_find_best_stream, %d, %s", ret, av_err2str(ret));
+        callPlayerOnError(isMainThread, ERR_AV_FIND_BEST_STREAM, av_err2str(ret));
+        return;
+    }
+    videoStreamIndex = ret;
+    pVideo = new ZVideo(zJniCall, pPlayerState, videoStreamIndex);
+    pVideo->analyzeStream(isMainThread, pFmtCtx);
+
     // 通知java层, native层已经准备完毕
     zJniCall->callPlayerOnPrepared(isMainThread);
 }
@@ -123,4 +146,10 @@ void ZFFmpeg::prepareAsync() {
     pthread_t prepareAsyncThread;
     pthread_create(&prepareAsyncThread, NULL, handlePrepareAsync, this);
     pthread_detach(prepareAsyncThread);
+}
+
+void ZFFmpeg::setSurface(jobject surface) {
+    if (pVideo) {
+        pVideo->setSurface(surface);
+    }
 }

@@ -5,14 +5,8 @@
 #ifndef P00_ZFFMPEG_H
 #define P00_ZFFMPEG_H
 
-extern "C" {
-#include "libavformat/avformat.h"
-#include <pthread.h>
-}
-
-#include "ZConstants.h"
-#include "ZJniCall.h"
 #include "ZAudio.h"
+#include "ZVideo.h"
 
 class ZFFmpeg {
 public:
@@ -23,6 +17,7 @@ public:
     ZPlayerState *pPlayerState = NULL;
 
     ZAudio *pAudio = NULL;
+    ZVideo *pVideo = NULL;
 
     ZFFmpeg(ZJniCall *zJniCall, const char *url);
     ~ZFFmpeg();
@@ -32,6 +27,8 @@ public:
     void prepareAsync();
     void prepare(bool isMainThread);
     void initReadPacket();
+
+    void setSurface(jobject surface);
 };
 
 

@@ -1,6 +1,7 @@
 package com.z.p00.player;
 
 import android.text.TextUtils;
+import android.view.Surface;
 
 import com.z.p00.player.listener.OnMediaErrorListener;
 import com.z.p00.player.listener.OnMediaPreparedListener;
@@ -61,4 +62,5 @@ public class ZPlayer {
 
     private native void nPlay();
 
+    public native void setSurface(Surface surface);
 }

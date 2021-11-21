@@ -6,17 +6,12 @@
 #define P00_ZAUDIO_H
 
 extern "C" {
-#include "libavformat/avformat.h"
 #include "libswresample/swresample.h"
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
-#include <pthread.h>
 }
 
 #include "ZConstants.h"
-#include "ZJniCall.h"
-#include "ZPacketQueue.h"
-#include "ZPlayerState.h"
 #include "ZMedia.h"
 
 class ZAudio : public ZMedia {

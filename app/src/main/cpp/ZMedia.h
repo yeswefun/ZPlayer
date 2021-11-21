@@ -6,9 +6,9 @@
 #define P00_ZMEDIA_H
 
 extern "C" {
+#include <pthread.h>
 #include "libavformat/avformat.h"
 };
-
 #include "ZJniCall.h"
 #include "ZPlayerState.h"
 #include "ZPacketQueue.h"

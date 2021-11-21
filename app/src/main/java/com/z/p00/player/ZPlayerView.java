@@ -48,8 +48,12 @@ public class ZPlayerView extends SurfaceView implements OnMediaPreparedListener 
         mPlayer.prepareAsync();
     }
 
+    /*
+        准备之后，播放之前
+     */
     @Override
     public void onPrepared() {
+        mPlayer.setSurface(getHolder().getSurface());
         Log.e(TAG, "准备完毕");
         mPlayer.play();
     }
