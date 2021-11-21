@@ -9,11 +9,13 @@ ZAudio::ZAudio(ZJniCall *zJniCall, ZPlayerState *pPlayerState, int audioStreamIn
 }
 
 ZAudio::~ZAudio() {
-    ZMedia::releaseZMedia();
     releaseZAudio();
 }
 
 void ZAudio::releaseZAudio() {
+
+    ZMedia::releaseZMedia();
+
     if (pResampleBuffer) {
         free(pResampleBuffer);
         pResampleBuffer = NULL;

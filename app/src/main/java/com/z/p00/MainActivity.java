@@ -3,7 +3,6 @@ package com.z.p00;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
-import android.view.Surface;
 import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -14,6 +13,15 @@ import java.io.File;
 
 /*
     一个简单的音视频播放器
+
+    18. 模板设计模式
+
+        两个线程共用同一个FormatContext
+            分离音视频需要放在zffmpeg中完成, 不然
+                获取音频packet时, 会扔掉视频packet
+                获取视频packet时, 会扔掉音频packet
+
+        一个线程处理一个FormatContext
 
     TODO: 存在的问题: 音视频不同步
  */
@@ -41,10 +49,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void handlePlay(View view) {
         mPlayer.play(mFile.getAbsolutePath());
-        decodeVideo(mPlayer.getHolder().getSurface(), mFile.getAbsolutePath());
     }
-
-    private native void decodeVideo(Surface surface, String absolutePath);
 }
 
 /*
