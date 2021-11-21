@@ -21,6 +21,13 @@ ZJniCall::~ZJniCall() {
     }
 }
 
+/*
+出现异常的处理方式
+    1. 回调java层
+    2. 释放native层资源
+
+注: 暂时不使用goto来处理, goto之后的代码不能再声明新变量 - 恶心
+ */
 void ZJniCall::callPlayerOnError(bool isMainThread, int code, const char *text) {
     if (isMainThread) {
         jstring jtext = jniEnv->NewStringUTF(text);
