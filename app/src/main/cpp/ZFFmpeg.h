@@ -17,10 +17,10 @@ extern "C" {
 class ZFFmpeg {
 public:
     AVFormatContext *pFmtCtx = NULL;
-    AVCodecContext *pCodecCtx = NULL;
-
     ZJniCall *zJniCall;
     char *url = NULL;
+
+    ZPlayerState *pPlayerState = NULL;
 
     ZAudio *pAudio = NULL;
 
@@ -31,6 +31,7 @@ public:
     void callPlayerOnError(bool isMainThread, int code, const char *text);
     void prepareAsync();
     void prepare(bool isMainThread);
+    void initReadPacket();
 };
 
 

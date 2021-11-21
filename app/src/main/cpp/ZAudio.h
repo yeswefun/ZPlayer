@@ -17,31 +17,23 @@ extern "C" {
 #include "ZJniCall.h"
 #include "ZPacketQueue.h"
 #include "ZPlayerState.h"
+#include "ZMedia.h"
 
-class ZAudio {
+class ZAudio : public ZMedia {
 public:
-    AVFormatContext *pFmtCtx;
-    AVCodecContext *pCodecCtx;
     SwrContext *pSwrCtx = NULL;
-
     uint8_t *pResampleBuffer = NULL;
-    int audioStreamIndex = -1;
-    ZJniCall *zJniCall;
 
-    ZPacketQueue *pPacketQueue = NULL;
-    ZPlayerState *pPlayerState = NULL;
-
-    ZAudio(ZJniCall *zJniCall, AVFormatContext *pFmtCtx, AVCodecContext *pCodecCtx, int audioStreamIndex);
+    ZAudio(ZJniCall *zJniCall, ZPlayerState *pPlayerState, int audioStreamIndex);
     ~ZAudio();
     void releaseZAudio();
 
-    void initOpenSLES();
     int resampleAudio();
-    void analyzeAudioStream(bool isMainThread);
-
+    void initOpenSLES();
     void play();
 
-    void initReadPacket();
+protected:
+    void analyzeStreamInternal(bool isMainThread, AVFormatContext *pFmtCtx);
 };
 
 

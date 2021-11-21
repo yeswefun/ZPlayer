@@ -17,6 +17,11 @@ ZFFmpeg::~ZFFmpeg() {
 
 void ZFFmpeg::releaseZFFmpeg() {
 
+    if (pPlayerState) {
+        delete pPlayerState;
+        pPlayerState = NULL;
+    }
+
     if (pAudio) {
         delete pAudio;
         pAudio = NULL;
@@ -27,16 +32,40 @@ void ZFFmpeg::releaseZFFmpeg() {
         url = NULL;
     }
 
-    if (pCodecCtx) {
-        avcodec_free_context(&pCodecCtx);
-    }
-
     if (pFmtCtx) {
         avformat_close_input(&pFmtCtx);
     }
 }
 
+void ZFFmpeg::initReadPacket() {
+    while (pPlayerState != NULL && !pPlayerState->isExit) {
+        AVPacket *pPacket = av_packet_alloc();
+        if (av_read_frame(pFmtCtx, pPacket) == 0) {
+            if (pPacket->stream_index == pAudio->streamIndex) {
+                LOGE("read packet - audio");
+                pAudio->pPacketQueue->push(pPacket);
+            } else {
+                av_packet_free(&pPacket);
+            }
+        } else {
+            LOGE("finished read packet - audio ***************");
+            break;
+        }
+    }
+}
+
+void* handleReadPacket(void *arg) {
+    ZFFmpeg *zFFmpeg = static_cast<ZFFmpeg *>(arg);
+    zFFmpeg->initReadPacket();
+    return NULL;
+}
+
 void ZFFmpeg::play() {
+
+    pthread_t readPacketThread;
+    pthread_create(&readPacketThread, NULL, handleReadPacket, this);
+    pthread_detach(readPacketThread);
+
     if (pAudio) {
         pAudio->play();
     }
@@ -48,6 +77,7 @@ void ZFFmpeg::callPlayerOnError(bool isMainThread, int code, const char *text) {
 }
 
 void ZFFmpeg::prepare(bool isMainThread) {
+
     int ret = -1;
     if ((ret = avformat_open_input(&pFmtCtx, url, NULL, NULL)) != 0) {
         callPlayerOnError(isMainThread, ERR_AVFORMAT_OPEN_INPUT, av_err2str(ret));
@@ -65,7 +95,10 @@ void ZFFmpeg::prepare(bool isMainThread) {
         LOGE("%s : %s", pEntry->key, pEntry->value);
     }
 
-    // 2. 输出音频的采样率和通道数
+    // 初始化播放器状态
+    pPlayerState = new ZPlayerState();
+
+    // 初始音频播放器
     int audioStreamIndex = -1;
     if ((ret = av_find_best_stream(pFmtCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0)) < 0) {
         LOGE("error: av_find_best_stream, %d, %s", ret, av_err2str(ret));
@@ -73,35 +106,8 @@ void ZFFmpeg::prepare(bool isMainThread) {
         return;
     }
     audioStreamIndex = ret;
-
-    AVCodecParameters *pCodecPar = pFmtCtx->streams[audioStreamIndex]->codecpar;
-    AVCodec *pCodec = avcodec_find_decoder(pCodecPar->codec_id);
-    if (pCodec == NULL) {
-        callPlayerOnError(isMainThread, ERR_AVCODEC_FIND_DECODER, "error: avcodec_find_decoder");
-        return;
-    }
-
-    pCodecCtx = avcodec_alloc_context3(pCodec);
-    if (pCodecCtx == NULL) {
-        callPlayerOnError(isMainThread, ERR_AVCODEC_ALLOC_CONTEXT3, "error: avcodec_alloc_context3");
-        return;
-    }
-
-    if ((ret = avcodec_parameters_to_context(pCodecCtx, pCodecPar)) < 0) {
-        callPlayerOnError(isMainThread, ERR_AVCODEC_PARAMETERS_TO_CONTEXT, av_err2str(ret));
-        return;
-    }
-
-    if ((ret = avcodec_open2(pCodecCtx, pCodec, NULL)) < 0) {
-        callPlayerOnError(isMainThread, ERR_AVCODEC_OPEN2, av_err2str(ret));
-        return;
-    }
-
-    LOGE("sample_rate: %d, channels: %d", pCodecCtx->sample_rate, pCodecCtx->channels);
-
-    // 初始音频播放器
-    pAudio = new ZAudio(zJniCall, pFmtCtx, pCodecCtx, audioStreamIndex);
-    pAudio->analyzeAudioStream(isMainThread);
+    pAudio = new ZAudio(zJniCall, pPlayerState, audioStreamIndex);
+    pAudio->analyzeStream(isMainThread, pFmtCtx);
 
     // 通知java层, native层已经准备完毕
     zJniCall->callPlayerOnPrepared(isMainThread);
