@@ -138,22 +138,26 @@ Java_com_z_p00_MainActivity_decodeVideo
     // 使用SurfaceView播放视频数据
     ANativeWindow *pNativeWindow = ANativeWindow_fromSurface(env, surface);
 
+    // 设置窗口的宽，高，像素格式
     ANativeWindow_setBuffersGeometry(pNativeWindow, pCodecCtx->width, pCodecCtx->height, WINDOW_FORMAT_RGBA_8888);
 
+    // SurfaceView的播放缓冲
     ANativeWindow_Buffer outputBuffer;
 
-    // 缩放上下文
-    struct SwsContext *pSwsCtx = sws_getContext(pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt, // src
-                   pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_RGBA,    // dst
-                   SWS_BILINEAR, NULL, NULL, NULL);
+    // 对视频进行缩放处理
+    SwsContext *pSwsCtx = sws_getContext(
+            pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt,        // src
+            pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_RGBA, // dst
+            SWS_BILINEAR, NULL, NULL, NULL);
 
+    // 转换后的格式所对应的内存大小
     int frameSize = av_image_get_buffer_size(AV_PIX_FMT_RGBA, pCodecCtx->width, pCodecCtx->height, 1);
     uint8_t *pFrameBuffer = (uint8_t *)malloc(frameSize);
-
+    // 为pFrameRGB挂上buffer, 这个buffer是用于存缓冲数据
     AVFrame *pFrameRGBA = av_frame_alloc();
-    av_image_fill_arrays(pFrameRGBA->data, pFrameRGBA->linesize,    // dst
-            pFrameBuffer,                                           // src
-            AV_PIX_FMT_RGBA, pCodecCtx->width, pCodecCtx->height, 1);
+    av_image_fill_arrays(pFrameRGBA->data, pFrameRGBA->linesize,    // dst, TODO: 这个函数到底做了什么?
+                         pFrameBuffer,                               // src
+                         AV_PIX_FMT_RGBA, pCodecCtx->width, pCodecCtx->height, 1);
 
     int frameIndex = 0;
     AVPacket *pPacket = av_packet_alloc();
