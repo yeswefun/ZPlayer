@@ -15,8 +15,6 @@ import java.io.File;
 /*
     一个简单的音视频播放器
 
-    TODO: 引入模板设计模式
-
     TODO: 存在的问题: 音视频不同步
  */
 public class MainActivity extends AppCompatActivity {

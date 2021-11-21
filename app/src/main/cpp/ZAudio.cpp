@@ -4,32 +4,16 @@
 
 #include "ZAudio.h"
 
-ZAudio::ZAudio(ZJniCall *zJniCall, AVFormatContext *pFmtCtx, AVCodecContext *pCodecCtx, int audioStreamIndex) {
-    this->zJniCall = zJniCall;
-    this->pFmtCtx = pFmtCtx;
-    this->pCodecCtx = pCodecCtx;
-    this->audioStreamIndex = audioStreamIndex;
-
-    this->pPacketQueue = new ZPacketQueue();
-    this->pPlayerState = new ZPlayerState();
+ZAudio::ZAudio(ZJniCall *zJniCall, ZPlayerState *pPlayerState, int audioStreamIndex)
+        : ZMedia(zJniCall, pPlayerState, audioStreamIndex) {
 }
 
 ZAudio::~ZAudio() {
+    ZMedia::releaseZMedia();
     releaseZAudio();
 }
 
 void ZAudio::releaseZAudio() {
-
-    if (pPlayerState) {
-        delete pPlayerState;
-        pPlayerState = NULL;
-    }
-
-    if (pPacketQueue) {
-        delete pPacketQueue;
-        pPacketQueue = NULL;
-    }
-
     if (pResampleBuffer) {
         free(pResampleBuffer);
         pResampleBuffer = NULL;
@@ -119,7 +103,8 @@ int ZAudio::resampleAudio() {
         if (avcodec_send_packet(pCodecCtx, pPacket) == 0) {
             if (avcodec_receive_frame(pCodecCtx, pFrame) == 0) {
                 // number of samples output per channel
-                dataSize = swr_convert(pSwrCtx, &pResampleBuffer, pFrame->nb_samples, (const uint8_t **)pFrame->data, pFrame->nb_samples);
+                dataSize = swr_convert(pSwrCtx, &pResampleBuffer, pFrame->nb_samples,
+                                       (const uint8_t **) pFrame->data, pFrame->nb_samples);
                 break;
             }
         }
@@ -132,30 +117,19 @@ int ZAudio::resampleAudio() {
     return dataSize * 2 * 2;
 }
 
-void* handlereadPacket(void *arg) {
-    ZAudio *pAudio = static_cast<ZAudio *>(arg);
-    pAudio->initReadPacket();
-    return NULL;
-}
-
-void* handlePlay(void *arg) {
+void *handlePlayAudio(void *arg) {
     ZAudio *pAudio = static_cast<ZAudio *>(arg);
     pAudio->initOpenSLES();
     return NULL;
 }
 
 void ZAudio::play() {
-    pthread_t readPacketThread;
-    pthread_create(&readPacketThread, NULL, handlereadPacket, this);
-    pthread_detach(readPacketThread);
-
     pthread_t playThread;
-    pthread_create(&playThread, NULL, handlePlay, this);
+    pthread_create(&playThread, NULL, handlePlayAudio, this);
     pthread_detach(playThread);
 }
 
-void ZAudio::analyzeAudioStream(bool isMainThread) {
-
+void ZAudio::analyzeStreamInternal(bool isMainThread, AVFormatContext *pFmtCtx) {
     /*
         6. 解决音频噪音问题 - 音频重采样
         struct SwrContext *swr_alloc_set_opts(struct SwrContext *s,
@@ -176,40 +150,26 @@ void ZAudio::analyzeAudioStream(bool isMainThread) {
                                  in_ch_layout, in_sample_fmt, in_sample_rate,
                                  0, NULL);
     if (pSwrCtx == NULL) {
-        zJniCall->callPlayerOnError(isMainThread, ERR_SWR_ALLOC_SET_OPTS, "error: swr_alloc_set_opts");
+        callPlayerOnError(isMainThread, ERR_SWR_ALLOC_SET_OPTS, "error: swr_alloc_set_opts");
         return;
     }
 
     int ret = -1;
     if ((ret = swr_init(pSwrCtx)) < 0) {
-        zJniCall->callPlayerOnError(isMainThread, ERR_SWR_INIT, "error: swr_init");
+        callPlayerOnError(isMainThread, ERR_SWR_INIT, "error: swr_init");
         return;
     }
 
     // 5. 解决内存上涨问题
     int out_channels = av_get_channel_layout_nb_channels(out_ch_layout);
-    int dataSize = av_samples_get_buffer_size(NULL, out_channels, pCodecCtx->frame_size, out_sample_fmt, 0);
+    int dataSize = av_samples_get_buffer_size(NULL, out_channels, pCodecCtx->frame_size,
+                                              out_sample_fmt, 0);
+
     // 重采样的数据缓冲区
-    pResampleBuffer = (uint8_t *)malloc(dataSize);
-}
+    pResampleBuffer = (uint8_t *) malloc(dataSize);
 
-void ZAudio::initReadPacket() {
-    while (pPlayerState != NULL && !pPlayerState->isExit) {
-        AVPacket *pPacket = av_packet_alloc();
-        if (av_read_frame(pFmtCtx, pPacket) == 0) {
-            if (pPacket->stream_index == audioStreamIndex) {
-                LOGE("read packet - audio");
-                pPacketQueue->push(pPacket);
-            } else {
-                av_packet_free(&pPacket);
-            }
-        } else {
-            LOGE("finished read packet - audio ***************");
-            break;
-        }
-    }
+    LOGE("sample_rate: %d, channels: %d", pCodecCtx->sample_rate, pCodecCtx->channels);
 }
-
 
 /*
     encoded packet -> decoded frame -> frame->data == pcm data
