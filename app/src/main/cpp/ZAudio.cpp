@@ -211,3 +211,40 @@ void ZAudio::initReadPacket() {
 }
 
 
+/*
+    encoded packet -> decoded frame -> frame->data == pcm data
+
+    canvas -> surface view -> dead loop -> every 16ms -> render once
+
+    AudioTrack
+
+    pFrame->data(c@data) -> write(java@data)
+
+    一秒数据的大小 != 一帧数据的大小, 一秒包含多个帧
+
+    一帧pcm的数据大小
+        采样点个数: pFrame->nb_samples, 44100个采样点
+        通道数: pFrame->channels, 2个通道
+        每个通道16位, 即2个字节
+
+        44100 * 2 * 2 (bytes)
+ */
+
+/*
+E/JNI_TAG: frame: 1
+    frame - channels: 2, nb_samples: 47, sample_fmt: 8
+    codecCtx - channels: 2, nb_samples: 1152, sample_fmt: 8
+    dataSize: 4608
+E/JNI_TAG: frame: 2
+    frame - channels: 2, nb_samples: 1152, sample_fmt: 8
+    codecCtx - channels: 2, nb_samples: 1152, sample_fmt: 8
+    dataSize: 4608
+E/JNI_TAG: frame: 3
+    frame - channels: 2, nb_samples: 1152, sample_fmt: 8
+    codecCtx - channels: 2, nb_samples: 1152, sample_fmt: 8
+    dataSize: 4608
+
+LOGE("frame - channels: %d, nb_samples: %d, sample_fmt: %d", frame->channels, frame->nb_samples, codecCtx->sample_fmt);
+LOGE("codecCtx - channels: %d, nb_samples: %d, sample_fmt: %d", codecCtx->channels, codecCtx->frame_size, codecCtx->sample_fmt);
+LOGE("dataSize: %d", dataSize);
+ */

@@ -67,7 +67,7 @@ void ZFFmpeg::prepare(bool isMainThread) {
 
     // 2. 输出音频的采样率和通道数
     int audioStreamIndex = -1;
-    if ((ret = av_find_best_stream(pFmtCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0))) {
+    if ((ret = av_find_best_stream(pFmtCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0)) < 0) {
         LOGE("error: av_find_best_stream, %d, %s", ret, av_err2str(ret));
         callPlayerOnError(isMainThread, ERR_AV_FIND_BEST_STREAM, av_err2str(ret));
         return;
